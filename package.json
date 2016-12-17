@@ -1,0 +1,26 @@
+{
+  "description": "Integrate Rust playpen with gitbook",
+  "engines": {
+    "gitbook": "*"
+  },
+  "dependencies": {
+    "fs-extra": "*",
+    "get-installed-path": "*",
+    "ace-builds": "*"
+  },
+  "main": "index.js",
+  "name": "gitbook-plugin-rust-playpen",
+  "version": "0.1.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Popog/gitbook-plugin-rust-playpen.git"
+  },
+  "homepage": "https://github.com/Popog/gitbook-plugin-rust-playpen",
+  "license": "(MIT OR Apache-2.0)",
+  "bugs": {
+    "url": "https://github.com/Popog/gitbook-plugin-rust-playpen/issues"
+  },
+  "scripts": {
+    "install": "node copy.js"
+  }
+}
