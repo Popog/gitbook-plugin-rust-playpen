@@ -3,9 +3,7 @@
   "engines": {
     "gitbook": "*"
   },
-  "dependencies": {
-    "fs-extra": "*",
-    "get-installed-path": "*",
+  "devDependencies": {
     "ace-builds": "*"
   },
   "main": "index.js",
@@ -21,6 +19,6 @@
     "url": "https://github.com/Popog/gitbook-plugin-rust-playpen/issues"
   },
   "scripts": {
-    "install": "node copy.js"
+    "prepublish": "cp ./node_modules/ace-builds/src-min/ace.js ./node_modules/ace-builds/src-min/theme-tomorrow.js ./node_modules/ace-builds/src-min/mode-rust.js book/ace"
   }
 }
