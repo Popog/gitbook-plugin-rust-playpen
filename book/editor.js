@@ -263,7 +263,7 @@ function formatCompilerOutput(text) {
         }
 
         var color = "";
-        switch line.level {
+        switch (line.level) {
             case "error":
                 color = " class=\"ansi-red\"";
                 break;
@@ -298,7 +298,7 @@ function formatCompilerOutput(text) {
         }
         for (let child of lines.children) {
             var ccolor = "";
-            switch child.level {
+            switch (child.level) {
                 case "error":
                     ccolor = " class=\"ansi-red\"";
                     break;
