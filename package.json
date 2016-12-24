@@ -8,17 +8,29 @@
   },
   "main": "index.js",
   "name": "gitbook-plugin-rust-playpen",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "repository": {
     "type": "git",
     "url": "https://github.com/Popog/gitbook-plugin-rust-playpen.git"
   },
   "homepage": "https://github.com/Popog/gitbook-plugin-rust-playpen",
-  "license": "(MIT OR Apache-2.0)",
+  "license": "((MIT OR Apache-2.0) AND BSD)",
   "bugs": {
     "url": "https://github.com/Popog/gitbook-plugin-rust-playpen/issues"
   },
   "scripts": {
-    "prepublish": "cp ./node_modules/ace-builds/src-min/ace.js ./node_modules/ace-builds/src-min/theme-tomorrow.js ./node_modules/ace-builds/src-min/mode-rust.js book/ace"
+    "prepublish": "cp ./node_modules/ace-builds/src-min/ace.js ./node_modules/ace-builds/src-min/mode-rust.js ./node_modules/ace-builds/src-min/theme-*.js book/ace"
+  },
+  "gitbook": {
+    "properties": {
+      "themes": {
+        "type": "array",
+        "title": "The ace themes to apply",
+        "description" : "This is a list of ace themes to apply for theme changes. The order is determines which gitbooks themes they are paired with",
+        "minItems": 1,
+        "items": { "type": "string" },
+        "default" : ["tomorrow", "solarized_light", "tomorrow_night"]
+      }
+    }
   }
 }
