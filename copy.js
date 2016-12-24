@@ -9,14 +9,13 @@ const FILES = [
     'mode-rust.js'
 ];
 
-/ ECMAScript 6 Backwards compatability
+// ECMAScript 6 Backwards compatability
 if (typeof String.prototype.startsWith != 'function') {
     String.prototype.startsWith = function(str, pos) {
         pos = pos || 0;
         return this.slice(pos, str.length) === str;
     };
 }
-
 if (typeof String.prototype.endsWith != 'function') {
     String.prototype.endsWith = function(searchString, position) {
         var subjectString = this.toString();
