@@ -6,8 +6,7 @@ module.exports = {
         ],
         js: [
             "ace/ace.js",
-            "editor.js",
-            "ace/mode-rust.js"
+            "editor.js"
         ]
     }
 };
