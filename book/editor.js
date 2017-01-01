@@ -2,14 +2,14 @@
 // plus small modifications to accommodate a "Reset" button
 
 // ECMAScript 6 Backwards compatability
-if (typeof String.prototype.startsWith != 'function') {
+if (typeof String.prototype.startsWith !== 'function') {
     String.prototype.startsWith = function(str, pos) {
         pos = pos || 0;
         return this.slice(pos, str.length) === str;
     };
 }
 
-var THEMES = ["tomorrow", "solarized_light", "tomorrow_night"];
+var THEMES = ['tomorrow', 'solarized_light', 'tomorrow_night'];
 
 // Regex for finding new lines
 var newLineRegex = /(?:\r\n|\r|\n)/g;
@@ -20,23 +20,11 @@ var resetButton;
 var runButton;
 var resultDiv;
 
-// Background colors for program result on success/error
-var successColor = "#E2EEF6";
-var errorColor = "#F6E2E2";
-var warningColor = "#FFFBCB";
-
 // Error message to return when there's a server failure
-var errMsg = "The server encountered an error while running the program.";
+var errMsg = 'The server encountered an error while running the program.';
 
-// Stores ACE editor markers (highights) for errors
-var markers = [];
-
-// Status codes, because there are no enums in Javascript
-var SUCCESS = 0;
-var ERROR = 1;
-var WARNING = 2;
-
-const Range = ace.require('ace/range').Range;
+var Range = ace.require('ace/range').Range;
+var MutationObserver = window.MutationObserver || window.WebKitMutationObserver || window.MozMutationObserver;
 
 // Ace editor
 var editor;
@@ -49,80 +37,80 @@ var MAX_RESPONSE_LENGTH = 50000;
 
 // Get the theme from number from a classList
 function getTheme(classList) {
-    for (var entry of classList.values()) {
-        if (entry.startsWith("color-theme-"))
-            return parseInt(entry.slice("color-theme-".length), 10);
+    for (var i = 0; i < classList.length; i++) {
+        var entry = classList[i];
+        if (entry.startsWith('color-theme-'))
+            return parseInt(entry.slice('color-theme-'.length), 10);
     }
     return 0
 }
 
-// Create a marker, returns the plugin marker ID, not the Ace marker ID
+// Create a marker, returns the Ace marker ID
 function createMarker(category, start_line, start_col, end_line, end_col) {
     var r = new Range(); // Creates a range with undefined values.
     r.start = editor.session.doc.createAnchor(start_line, start_col);
     r.end = editor.session.doc.createAnchor(end_line, end_col);
-    var id = editor.session.addMarker(r, "ace-" + category + "-text", "text", false);
-    var marker = {
-        range: r,
-        id: id,
-        category: category
-    };
-    id = markers.length;
-    markers.push(marker);
-    return id;
+    return editor.session.addMarker(r, 'ace-' + category + '-text', 'text', false);
 }
 
-// Set the highlight mode of a marker, takes the plugin marker ID, not the Ace marker ID
+// Set the highlight mode of a marker, takes an Ace marker ID and a boolean
 function highlightMarker(id, highlight) {
-    var marker = markers[id];
-    editor.session.removeMarker(marker.id);
-    highlight = highlight ? "highlight-" : "";
-    marker.id = editor.session.addMarker(marker.range, "ace-" + highlight + marker.category + "-text", "text", false);
-    editor.scrollToLine(Math.round((marker.range.start.row + marker.range.end.row) / 2) - 1, true, true);
+    marker = editor.session.getMarkers()[id];
+    if (highlight)
+        marker.clazz += ' ace-hover-text';
+    else
+        marker.clazz = marker.clazz.split(" ", 1)[0];
+
+    editor.scrollToLine(Math.round((marker.range.start.row + marker.range.end.row) / 2), true, true);
 }
 
-// Moves the cursor to a marker, takes the plugin marker ID, not the Ace marker ID
+// Moves the cursor to a marker, takes an Ace marker ID
 function focusMarker(id) {
-    var marker = markers[id];
+    var marker = editor.session.getMarkers()[id];
     editor.focus();
     editor.scrollToLine(marker.range.start.row - 1, true, true);
     editor.selection.clearSelection();
-    editor.selection.moveCursorTo(marker.range.start.row - 1, marker.range.start.column - 1, false);
+    editor.selection.moveCursorTo(marker.range.start.row, marker.range.start.column, false);
 }
 
 // Removes all the markers
 function clearMarkers() {
-    for (let marker of markers) {
+    // getMarkers returns an object, not an array.
+    var markers = editor.session.getMarkers();
+    for (var id in markers) {
+        var marker = markers[id];
+
+        // Skip markers that we didn't create
+        if (marker.clazz.search(/ace-.*-text/) === -1) continue;
+
         marker.range.end.detach();
         marker.range.start.detach();
         editor.session.removeMarker(marker.id);
     }
-    markers = []
 }
 
 function initEditor() {
     // Fetching DOM items
-    editorDiv = document.getElementById("editor");
-    resetButton = document.getElementById("reset-code");
-    runButton = document.getElementById("run-code");
-    resultDiv = document.getElementById("result");
+    editorDiv = document.getElementById('editor');
+    resetButton = document.getElementById('reset-code');
+    runButton = document.getElementById('run-code');
+    resultDiv = document.getElementById('result');
 
     // No editor on this page
     if (editorDiv === null) return;
 
     // Watch the book so we can change themes
-    var book = document.querySelector("div.book");
-    const MutationObserver = window.MutationObserver || window.WebKitMutationObserver || window.MozMutationObserver;
+    var book = document.querySelector('div.book');
     if (MutationObserver) {
-        var observer = new MutationObserver(mutations =>
-            mutations.forEach(e => {
-                if (e.attributeName !== "class") return;
+        var observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(e) {
+                if (e.attributeName !== 'class') return;
                 var nextTheme = getTheme(book.classList)
                 if (nextTheme === theme) return;
                 theme = nextTheme;
-                editor.setTheme("ace/theme/" + themes[theme])
-            })
-        );
+                editor.setTheme('ace/theme/' + THEMES[theme])
+            });
+        });
 
         observer.observe(book, {
             subtree: false,
@@ -131,19 +119,19 @@ function initEditor() {
     }
 
     // Setup ace editor
-    editor = ace.edit("editor");
+    editor = ace.edit('editor');
 
     theme = getTheme(book.classList);
-    editor.setTheme("ace/theme/" + THEMES[theme])
-    editor.session.setMode("ace/mode/rust");
+    editor.setTheme('ace/theme/' + THEMES[theme])
+    editor.session.setMode('ace/mode/rust');
     editor.setShowPrintMargin(false);
     editor.renderer.setShowGutter(false);
     editor.setHighlightActiveLine(false);
     editor.commands.addCommand({
-        name: "run",
+        name: 'run',
         bindKey: {
-            win: "Ctrl-Enter",
-            mac: "Ctrl-Enter"
+            win: 'Ctrl-Enter',
+            mac: 'Ctrl-Enter'
         },
         exec: executeCode
     })
@@ -154,38 +142,37 @@ function initEditor() {
     updateEditorHeight();
 
     // Registering handler for run button click
-    runButton.addEventListener("click", executeCode);
+    runButton.addEventListener('click', executeCode);
 
     // Registering handler for reset button click
-    resetButton.addEventListener("click", (ev) => {
+    resetButton.addEventListener('click', function(ev) {
         // Clear previous markers, if any
         clearMarkers()
 
         editor.session.setValue(originalCode);
-        resultDiv.style.display = "none";
+        resultDiv.style.display = 'none';
     });
 
     editor.on('change', updateEditorHeight);
 
     // Highlight active line when focused
-    editor.on('focus', () => editor.setHighlightActiveLine(true));
+    editor.on('focus', function() { editor.setHighlightActiveLine(true) });
 
     // Don't when not
-    editor.on('blur', () => editor.setHighlightActiveLine(false));
+    editor.on('blur', function() { editor.setHighlightActiveLine(false) });
 }
 
-require(["gitbook"], gitbook => {
-
+require(['gitbook'], function(gitbook) {
     // Init configuration at start
-    gitbook.events.bind('start', (e, config) => {
-        var opts = config["gitbook-plugin-rust-playpen"];
-        THEMES = opts.themes;
-        for (const theme of THEMES) {
-            ace.require("ace/theme/" + theme);
+    gitbook.events.bind('start', function(e, config) {
+        var opts = config['rust-playpen'];
+        THEMES = opts.themes || THEMES;
+        for (var theme of THEMES) {
+            ace.require('ace/theme/' + theme);
         }
     });
 
-    gitbook.events.bind("page.change", initEditor)
+    gitbook.events.bind('page.change', initEditor)
 });
 
 // Changes the height of the editor to match its contents
@@ -195,7 +182,7 @@ function updateEditorHeight() {
         editor.renderer.lineHeight +
         editor.renderer.scrollBar.getWidth();
 
-    editorDiv.style.height = Math.ceil(newHeight).toString() + "px";
+    editorDiv.style.height = Math.ceil(newHeight).toString() + 'px';
     editor.resize();
 };
 
@@ -207,19 +194,19 @@ function updateEditorHeight() {
 // http://stackoverflow.com/questions/24816/escaping-html-strings-with-jquery/12034334#12034334
 //
 var entityMap = {
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
     '"': '&quot;',
-    "'": '&#39;',
-    "/": '&#x2F;'
+    '\'': '&#39;',
+    '/': '&#x2F;'
 };
 
 function escapeHTML(unsafe) {
-    return String(unsafe).replace(/[&<>"'\/]/g, s => entityMap[s]);
+    return String(unsafe).replace(/[&<>"'\/]/g, function(s) { return entityMap[s] });
 }
 
-const COLOR_CODES = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'];
+var COLOR_CODES = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'white'];
 
 // A simple function to decode ANSI escape codes into HTML.
 // This is very basic, with lots of very obvious omissions and holes;
@@ -237,89 +224,107 @@ function ansi2html(text) {
     return text.replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
-        .replace(/\x1b\[1m\x1b\[3([0-7])m([^\x1b]*)(?:\x1b\(B)?\x1b\[0?m/g, (original, colorCode, text) => '<span class=ansi-' + COLOR_CODES[+colorCode] + '><strong>' + text + '</strong></span>')
-        .replace(/\x1b\[3([0-7])m([^\x1b]*)(?:\x1b\(B)?\x1b\[0?m/g, (original, colorCode, text) => '<span class=ansi-' + COLOR_CODES[+colorCode] + '>' + text + '</span>')
-        .replace(/\x1b\[1m([^\x1b]*)(?:\x1b\(B)?\x1b\[0?m/g, (original, text) => "<strong>" + text + "</strong>")
+        .replace(/\x1b\[1m\x1b\[3([0-7])m([^\x1b]*)(?:\x1b\(B)?\x1b\[0?m/g, function(original, colorCode, text) { return '<span class=ansi-' + COLOR_CODES[+colorCode] + '><strong>' + text + '</strong></span>' })
+        .replace(/\x1b\[3([0-7])m([^\x1b]*)(?:\x1b\(B)?\x1b\[0?m/g, function(original, colorCode, text) { return '<span class=ansi-' + COLOR_CODES[+colorCode] + '>' + text + '</span>' })
+        .replace(/\x1b\[1m([^\x1b]*)(?:\x1b\(B)?\x1b\[0?m/g, function(original, text) { return '<strong>' + text + '</strong>' })
         .replace(/(?:\x1b\(B)?\x1b\[0m/g, '');
 }
 
-function formatCompilerOutput(text) {
-    var output = "";
-    for (let [i, line] of text.split(newLineRegex).entries()) {
+function processCompilerOutput(text) {
+    var output = '';
+    var error = false;
+    text.split(newLineRegex).forEach(function(line, i) {
+        if (!line.startsWith('{')) {
+          output += ansi2html(line) + '\n';
+          return;
+        }
+
+        error = error || line.level === 'error';
+
         line = JSON.parse(line);
         if (line.rendered) {
             var span_id = 0;
             output += ansi2html(line.rendered)
-                .replace(/<strong>error\[(E\d\d\d\d)\]<\/strong>/g, (text, code) => "<strong>error[<a href=https://doc.rust-lang.org/error-index.html#" + code + " target=_blank>" + code + "</a>]</strong>")
-                .replace(/^  <span class="ansi-blue"><strong>--&gt; <\/strong><\/span>&lt;.*?&gt;:\d+:\d+$/mg, (text) => {
+                .replace(/<strong>error\[(E\d\d\d\d)\]<\/strong>/g, function(text, code){ return '<strong>error[<a href=https://doc.rust-lang.org/error-index.html#' + code + ' target=_blank>' + code + '</a>]</strong>' })
+                .replace(/^  <span class="ansi-blue"><strong>--&gt; <\/strong><\/span>&lt;.*?&gt;:\d+:\d+$/mg, function(text) {
                     var span = line.spans[span_id]
                     span_id++;
-                    return "  <span class=\"ansi-blue\"><strong>--&gt; </strong></span><a onclick=\"javascript:focusMarker(" +
-                        id + ")\" onmouseover=\"javascript:highlightMarker(" +
-                        id + ",true)\" onmouseout=\"javascript:highlightMarker(" +
-                        id + ", false)\" class=\"linejump\">" + escapeHTML(span.file_name) + ":" + span.line_start + ":" + span.column_start + "</a>"
-                });
-            continue
+                    return '  <span class="ansi-blue"><strong>--&gt; </strong></span><a onclick="javascript:focusMarker(' +
+                        id + ')" onmouseover="javascript:highlightMarker(' +
+                        id + ',true)" onmouseout="javascript:highlightMarker(' +
+                        id + ', false)" class="linejump">' + escapeHTML(span.file_name) + ':' + span.line_start + ':' + span.column_start + '</a>';
+                }) + '\n';
+            return;
         }
 
-        var color = "";
-        switch line.level {
-            case "error":
-                color = " class=\"ansi-red\"";
+        var color = '';
+        switch (line.level) {
+            case 'error':
+                color = ' class="ansi-red"';
                 break;
             case "warning":
-                color = " class=\"ansi-yellow\"";
+                color = ' class="ansi-yellow"';
                 break;
         }
 
 
-        output += "<span" + color + "><strong>" + line.level;
+        output += '<span' + color + '><strong>' + line.level;
         if (line.code && line.code.code) {
-            output += "[<a href=\"https://doc.rust-lang.org/error-index.html#" + line.code.code + "\" target=\"_blank\">" + line.code.code + "</a>]";
+            output += '[<a href="https://doc.rust-lang.org/error-index.html#' + line.code.code + '" target="_blank">' + line.code.code + '</a>]';
         }
-        output += "</strong></span><strong>: " + line.message + "</strong>";
+        output += '</strong></span><strong>: ' + line.message + '</strong>';
 
-        for (let span of line.spans) {
-            var spaces = " ".repeat(span.line_start.toString().length);
+        for (var span of line.spans) {
+            if (span.expansion && span.expansion.span)
+                line.spans.push(span.expansion.span);
+
+            if (span.file_name !== '<anon>')
+                continue;
+
+            var spaces = ' '.repeat(span.line_start.toString().length);
             var id = createMarker(line.level, span.line_start - 1, span.column_start - 1, span.line_end - 1, span.column_end - 1);
-            output += "\n" + spaces + "<span class=\"ansi-blue\"><strong>--&gt; </strong></span><a onclick=\"javascript:focusMarker(" +
-                id + ")\" onmouseover=\"javascript:highlightMarker(" +
-                id + ",true)\" onmouseout=\"javascript:highlightMarker(" +
-                id + ", false)\" class=\"linejump\">" + escapeHTML(span.file_name) + ":" + span.line_start + ":" + span.column_start + "</a>" +
-                "\n" + spaces + " <span class=\"ansi-blue\"><strong>|</strong></span>";
-            for (let [line_number, text] of span.text) {
+            output += '\n' + spaces + '<span class="ansi-blue"><strong>--&gt; </strong></span><a onclick="javascript:focusMarker(' +
+                id + ')" onmouseover="javascript:highlightMarker(' +
+                id + ',true)" onmouseout="javascript:highlightMarker(' +
+                id + ', false)" class="linejump">' + escapeHTML(span.file_name) + ':' + span.line_start + ':' + span.column_start + '</a>' +
+                '\n' + spaces + ' <span class="ansi-blue"><strong>|</strong></span>';
+            span.text.forEach(function(text, line_number) {
                 line_number += span.line_start;
-                var highlight_spaces = ;
-                var highlight
-                output += "\n" + "<span class=\"ansi-blue\"><strong>" + line_number + " | </strong></span> " + text.text +
-                    "\n" + spaces + " <span class=\"ansi-blue\"><strong>| </strong></span>" + " ".repeat(text.highlight_start) + "<span" + color + "><strong>" + "^".repeat(text.highlight_end - text.highlight_start) + "</strong></span><span" + color + "><strong> " + span.label + "</strong></span>";
-            }
-            output += "\n" + spaces + " <span class=\"ansi-blue\"><strong>|</strong></span>";
+                output += '\n<span class="ansi-blue"><strong>' + line_number + ' | </strong></span> ' + text.text +
+                    '\n' + spaces + ' <span class="ansi-blue"><strong>| </strong></span>' + ' '.repeat(text.highlight_start) + '<span' + color + '><strong>' + '^'.repeat(text.highlight_end - text.highlight_start) + '</strong></span><span' + color + '><strong> ' + (span.label || '') + '</strong></span>';
+            });
+            if (span.label)
+                output += '\n' + spaces + ' <span class=\"ansi-blue\"><strong>|</strong></span>';
         }
-        for (let child of lines.children) {
-            var ccolor = "";
-            switch child.level {
-                case "error":
-                    ccolor = " class=\"ansi-red\"";
+        for (var child of line.children) {
+            var ccolor = '';
+            switch (child.level) {
+                case 'error':
+                    ccolor = ' class="ansi-red"';
                     break;
-                case "warning":
-                    ccolor = " class=\"ansi-yellow\"";
+                case 'warning':
+                    ccolor = ' class="ansi-yellow"';
                     break;
             }
 
-            output += "\n" + spaces + " <span class=\"ansi-blue\"><strong>= </strong></span><span" + ccolor + "><strong>" + child.level;
+            output += '\n' + spaces + ' <span class="ansi-blue"><strong>= </strong></span><span' + ccolor + '><strong>' + child.level;
             if (child.code && child.code.code) {
-                output += "[<a href=\"https://doc.rust-lang.org/error-index.html#" + child.code.code + "\" target=\"_blank\">" + child.code.code + "</a>]";
+                output += '[<a href="https://doc.rust-lang.org/error-index.html#' + child.code.code + '" target="_blank">' + child.code.code + '</a>]';
             }
-            output += "</strong></span><strong>: " + child.message + "</strong>";
+            output += '</strong></span><strong>: ' + child.message + '</strong>';
         }
-        output += "\n";
-    }
+        output += '\n';
+    });
+
+    // Remove the trailing CR
+    output = output.slice(0, -1);
+
+    return {output: output, error: error};
 }
 
 function executeCode() {
-    resultDiv.style.display = "block";
-    resultDiv.innerHTML = "Running...";
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = 'Running...';
 
     // Clear previous markers
     clearMarkers();
@@ -334,8 +339,8 @@ function executeCode() {
 function runProgram(program, callback) {
     var req = new XMLHttpRequest();
     var data = JSON.stringify({
-        version: "stable",
-        optimize: "0",
+        version: 'stable',
+        optimize: '0',
         separate_output: true,
         color: true,
         code: program,
@@ -343,49 +348,47 @@ function runProgram(program, callback) {
     });
 
     // console.log("Sending", data);
-    req.open('POST', "https://play.rust-lang.org/evaluate.json", true);
-    req.onload = function(e) {
-        if (req.readyState === 4 && req.status === 200) {
-            var response = JSON.parse(req.response);
-            if (response.rustc && response.program) {
-                return callback({
-                    compiler: response.rustc,
-                    program: response.program
-                });
-            }
-        }
-        callback();
+    req.open('POST', 'https://play.rust-lang.org/evaluate.json', true);
+    req.onreadystatechange = function() {
+        // Wait for the request to complete
+        if (req.readyState !== 4) return;
+        if (req.status !== 200) return callback();
+
+        var response = JSON.parse(req.response);
+        if (!response.rustc) return callback();
+
+        return callback({
+            compiler: response.rustc,
+            program: response.program
+        });
     };
 
-    req.onerror = function(e) {
-        callback();
-    }
-
-    req.setRequestHeader("Content-Type", "application/json");
+    req.setRequestHeader('Content-Type', 'application/json');
     req.send(data);
 }
 
 // The callback to runProgram
 function handleResult(result) {
     // Clear out the result content
-    resultDiv.textContent = "";
+    resultDiv.textContent = '';
 
     // If we got here from some unknown error, just bail
     if (result === undefined) {
-        var samp = document.createElement("samp");
+        var samp = document.createElement('samp');
         samp.innerHTML = errMsg;
-        var pre = document.createElement("pre");
-        pre.className = "rustc-output rustc-errors"
+        var pre = document.createElement('pre');
+        pre.className = 'rustc-output rustc-errors'
         pre.appendChild(samp);
         resultDiv.appendChild(pre);
         return;
     }
 
-    var compiler = result.compiler || "";
-    var program = result.program || "";
+    var compiler = result.compiler || '';
+    var program = result.program || '';
 
     // Unpack the compiler output from the json format
-    compiler = processCompilerOutput(compiler);
+    var processed = processCompilerOutput(compiler);
+    compiler = processed.output;
 
     // Check the size of the message, shorten it if
     // it's too big to be appended to the DOM.
@@ -397,24 +400,22 @@ function handleResult(result) {
     program = program.split(newLineRegex).map(escapeHTML).join('<br />');
 
 
-    var samp = document.createElement("samp");
+    var samp = document.createElement('samp');
     samp.innerHTML = compiler;
-    var pre = document.createElement("pre");
-    if (statusCode == SUCCESS) {
-        pre.className = "rustc-output"
-    } else if (statusCode == WARNING) {
-        pre.className = "rustc-output rustc-warnings";
-    } else {
-        pre.className = "rustc-output rustc-errors";
+    var pre = document.createElement('pre');
+    pre.className = 'rustc-output';
+    if (!program)
+        pre.className += processed.error ? ' rustc-errors' : ' rustc-warnings';
+    pre.appendChild(samp);
+    resultDiv.appendChild(pre);
+
+
+    if (program) {
+        var samp = document.createElement('samp');
+        samp.innerHTML = program;
+        var pre = document.createElement('pre');
+        pre.className = 'output'
+        pre.appendChild(samp);
+        resultDiv.appendChild(pre);
     }
-    pre.appendChild(samp);
-    resultDiv.appendChild(pre);
-
-
-    var samp = document.createElement("samp");
-    samp.innerHTML = program;
-    var pre = document.createElement("pre");
-    pre.className = "output"
-    pre.appendChild(samp);
-    resultDiv.appendChild(pre);
 }
