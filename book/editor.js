@@ -14,23 +14,17 @@ var THEMES = ['tomorrow', 'solarized_light', 'tomorrow_night'];
 // Regex for finding new lines
 var newLineRegex = /(?:\r\n|\r|\n)/g;
 
-// DOM items
-var editorDiv;
-var resetButton;
-var runButton;
-var resultDiv;
-
 // Error message to return when there's a server failure
 var errMsg = 'The server encountered an error while running the program.';
 
 var Range = ace.require('ace/range').Range;
 var MutationObserver = window.MutationObserver || window.WebKitMutationObserver || window.MozMutationObserver;
 
-// Ace editor
-var editor;
+// The current theme
+var currentTheme = undefined;
 
-// Original source code
-var originalCode;
+// Ace editor info
+var activeCodes;
 
 // Maximum length of a response before it has to be truncated
 var MAX_RESPONSE_LENGTH = 50000;
@@ -42,11 +36,18 @@ function getTheme(classList) {
         if (entry.startsWith('color-theme-'))
             return parseInt(entry.slice('color-theme-'.length), 10);
     }
-    return 0
+    return 0;
+}
+
+// Get the editor id number from an id
+function getActiveCodeId(id) {
+    if (id.startsWith('active-code-'))
+        return parseInt(id.slice('active-code-'.length), 10);
+    return undefined;
 }
 
 // Create a marker, returns the Ace marker ID
-function createMarker(category, start_line, start_col, end_line, end_col) {
+function createMarker(editor, category, start_line, start_col, end_line, end_col) {
     var r = new Range(); // Creates a range with undefined values.
     r.start = editor.session.doc.createAnchor(start_line, start_col);
     r.end = editor.session.doc.createAnchor(end_line, end_col);
@@ -54,7 +55,8 @@ function createMarker(category, start_line, start_col, end_line, end_col) {
 }
 
 // Set the highlight mode of a marker, takes an Ace marker ID and a boolean
-function highlightMarker(id, highlight) {
+function highlightMarker(activeCodeId, id, highlight) {
+    var editor = activeCodes[activeCodeId].editor;
     marker = editor.session.getMarkers()[id];
     if (highlight)
         marker.clazz += ' ace-hover-text';
@@ -65,7 +67,8 @@ function highlightMarker(id, highlight) {
 }
 
 // Moves the cursor to a marker, takes an Ace marker ID
-function focusMarker(id) {
+function focusMarker(activeCodeId, id) {
+    var editor = activeCodes[activeCodeId].editor;
     var marker = editor.session.getMarkers()[id];
     editor.focus();
     editor.scrollToLine(marker.range.start.row - 1, true, true);
@@ -74,7 +77,7 @@ function focusMarker(id) {
 }
 
 // Removes all the markers
-function clearMarkers() {
+function clearMarkers(editor) {
     // getMarkers returns an object, not an array.
     var markers = editor.session.getMarkers();
     for (var id in markers) {
@@ -89,77 +92,15 @@ function clearMarkers() {
     }
 }
 
-function initEditor() {
-    // Fetching DOM items
-    editorDiv = document.getElementById('editor');
-    resetButton = document.getElementById('reset-code');
-    runButton = document.getElementById('run-code');
-    resultDiv = document.getElementById('result');
+// The callback for the Reset button
+function resetCode(activeCodeId) {
+    var activeCode = activeCodes[activeCodeId];
 
-    // No editor on this page
-    if (editorDiv === null) return;
+    // Clear previous markers, if any
+    clearMarkers(activeCode.editor)
 
-    // Watch the book so we can change themes
-    var book = document.querySelector('div.book');
-    if (MutationObserver) {
-        var observer = new MutationObserver(function(mutations) {
-            mutations.forEach(function(e) {
-                if (e.attributeName !== 'class') return;
-                var nextTheme = getTheme(book.classList)
-                if (nextTheme === theme) return;
-                theme = nextTheme;
-                editor.setTheme('ace/theme/' + THEMES[theme])
-            });
-        });
-
-        observer.observe(book, {
-            subtree: false,
-            attributes: true
-        });
-    }
-
-    // Setup ace editor
-    editor = ace.edit('editor');
-
-    theme = getTheme(book.classList);
-    editor.setTheme('ace/theme/' + THEMES[theme])
-    editor.session.setMode('ace/mode/rust');
-    editor.setShowPrintMargin(false);
-    editor.renderer.setShowGutter(false);
-    editor.setHighlightActiveLine(false);
-    editor.commands.addCommand({
-        name: 'run',
-        bindKey: {
-            win: 'Ctrl-Enter',
-            mac: 'Ctrl-Enter'
-        },
-        exec: executeCode
-    })
-
-    originalCode = editor.session.getValue();
-
-    // Set initial size to match initial content
-    updateEditorHeight();
-
-    // Registering handler for run button click
-    runButton.addEventListener('click', executeCode);
-
-    // Registering handler for reset button click
-    resetButton.addEventListener('click', function(ev) {
-        // Clear previous markers, if any
-        clearMarkers()
-
-        editor.session.setValue(originalCode);
-        resultDiv.style.display = 'none';
-    });
-
-    editor.on('change', updateEditorHeight);
-
-    // Highlight active line when focused
-    editor.on('focus', function() { editor.setHighlightActiveLine(true) });
-
-    // Don't when not
-    editor.on('blur', function() { editor.setHighlightActiveLine(false) });
+    activeCode.editor.session.setValue(activeCode.originalCode);
+    activeCode.resultDiv.style.display = 'none';
 }
 
 require(['gitbook'], function(gitbook) {
@@ -170,21 +111,73 @@ require(['gitbook'], function(gitbook) {
         for (var theme of THEMES) {
             ace.require('ace/theme/' + theme);
         }
+
+        // Watch the book so we can change themes
+        var book = document.querySelector('div.book');
+        currentTheme = getTheme(book.classList);
+        if (MutationObserver) {
+            var observer = new MutationObserver(function(mutations) {
+                mutations.forEach(function(e) {
+                    if (e.attributeName !== 'class') return;
+                    var nextTheme = getTheme(book.classList)
+                    if (nextTheme === currentTheme) return;
+                    currentTheme = nextTheme;
+                    for (var activeCode of activeCodes) {
+                        activeCode.editor.setTheme('ace/theme/' + THEMES[currentTheme]);
+                    }
+                });
+            });
+
+            observer.observe(book, {
+                subtree: false,
+                attributes: true
+            });
+        }
+
     });
 
-    gitbook.events.bind('page.change', initEditor)
+    gitbook.events.bind('page.change', function() {
+        activeCodes = [];
+        // Fetching DOM items
+        var activeCodeDivs = document.getElementsByClassName('active-code');
+        for (var i = 0; i < activeCodeDivs.length; i++) {
+            var acd = activeCodeDivs[i];
+
+            // Setup ace editor
+            var editorDiv = acd.querySelector('div.editor');
+            var editor = ace.edit(editorDiv);
+            editor.setTheme('ace/theme/' + THEMES[currentTheme])
+            editor.setOptions({ maxLines: 15 });
+            editor.session.setMode('ace/mode/rust');
+            editor.setShowPrintMargin(false);
+            editor.renderer.setShowGutter(false);
+            editor.setHighlightActiveLine(false);
+            editor.$blockScrolling = Infinity;
+            // Highlight active line when focused
+            editor.on('focus', editor.setHighlightActiveLine.bind(editor, true));
+            editor.on('blur', editor.setHighlightActiveLine.bind(editor, false));
+
+            var activeCode = {
+                id: getActiveCodeId(acd.id),
+                editorDiv: editorDiv,
+                resultDiv: acd.querySelector('div.result'),
+                editor: editor,
+                originalCode: editor.session.getValue()
+            };
+            activeCodes[activeCode.id] = activeCode;
+
+            // Setup any callbacks
+            editor.commands.addCommand({
+                name: 'run',
+                bindKey: {
+                    win: 'Ctrl-Enter',
+                    mac: 'Ctrl-Enter'
+                },
+                exec: executeCode.bind(undefined, activeCode.id)
+            });
+        }
+    })
 });
-
-// Changes the height of the editor to match its contents
-function updateEditorHeight() {
-    // http://stackoverflow.com/questions/11584061/
-    var newHeight = editor.session.getScreenLength() *
-        editor.renderer.lineHeight +
-        editor.renderer.scrollBar.getWidth();
-
-    editorDiv.style.height = Math.ceil(newHeight).toString() + 'px';
-    editor.resize();
-};
 
 //
 // escapeHTML() borrowed from mustache.js:
@@ -230,7 +223,7 @@ function ansi2html(text) {
         .replace(/(?:\x1b\(B)?\x1b\[0m/g, '');
 }
 
-function processCompilerOutput(text) {
+function processCompilerOutput(activeCode, text) {
     var output = '';
     var error = false;
     text.split(newLineRegex).forEach(function(line, i) {
@@ -249,9 +242,9 @@ function processCompilerOutput(text) {
                 .replace(/^  <span class="ansi-blue"><strong>--&gt; <\/strong><\/span>&lt;.*?&gt;:\d+:\d+$/mg, function(text) {
                     var span = line.spans[span_id]
                     span_id++;
-                    return '  <span class="ansi-blue"><strong>--&gt; </strong></span><a onclick="javascript:focusMarker(' +
-                        id + ')" onmouseover="javascript:highlightMarker(' +
-                        id + ',true)" onmouseout="javascript:highlightMarker(' +
+                    return '  <span class="ansi-blue"><strong>--&gt; </strong></span><a onclick="javascript:focusMarker(' +  activeCode.id + ', ' +
+                        id + ')" onmouseover="javascript:highlightMarker(' +  activeCode.id + ', ' +
+                        id + ', true)" onmouseout="javascript:highlightMarker(' + activeCode.id + ', ' +
                         id + ', false)" class="linejump">' + escapeHTML(span.file_name) + ':' + span.line_start + ':' + span.column_start + '</a>';
                 }) + '\n';
             return;
@@ -282,10 +275,10 @@ function processCompilerOutput(text) {
                 continue;
 
             var spaces = ' '.repeat(span.line_start.toString().length);
-            var id = createMarker(line.level, span.line_start - 1, span.column_start - 1, span.line_end - 1, span.column_end - 1);
-            output += '\n' + spaces + '<span class="ansi-blue"><strong>--&gt; </strong></span><a onclick="javascript:focusMarker(' +
-                id + ')" onmouseover="javascript:highlightMarker(' +
-                id + ',true)" onmouseout="javascript:highlightMarker(' +
+            var id = createMarker(activeCode.editor, line.level, span.line_start - 1, span.column_start - 1, span.line_end - 1, span.column_end - 1);
+            output += '\n' + spaces + '<span class="ansi-blue"><strong>--&gt; </strong></span><a onclick="javascript:focusMarker(' + activeCode.id + ', ' +
+                id + ')" onmouseover="javascript:highlightMarker(' + activeCode.id + ', ' +
+                id + ',true)" onmouseout="javascript:highlightMarker(' + activeCode.id + ', ' +
                 id + ', false)" class="linejump">' + escapeHTML(span.file_name) + ':' + span.line_start + ':' + span.column_start + '</a>' +
                 '\n' + spaces + ' <span class="ansi-blue"><strong>|</strong></span>';
             span.text.forEach(function(text, line_number) {
@@ -322,21 +315,19 @@ function processCompilerOutput(text) {
     return {output: output, error: error};
 }
 
-function executeCode() {
-    resultDiv.style.display = 'block';
-    resultDiv.innerHTML = 'Running...';
+// The callback for the Run button
+function executeCode(activeCodeId) {
+    var activeCode = activeCodes[activeCodeId];
+
+    activeCode.resultDiv.style.display = 'block';
+    activeCode.resultDiv.innerHTML = 'Running...';
 
     // Clear previous markers
-    clearMarkers();
+    clearMarkers(activeCode.editor);
 
     // Get the code, run the program
-    var program = editor.getValue();
-    runProgram(program, handleResult);
-};
+    var program = activeCode.editor.getValue();
 
-// Dispatches a XMLHttpRequest to the Rust playpen, running the program, and
-// issues a callback to `callback` with the result (or null on error)
-function runProgram(program, callback) {
     var req = new XMLHttpRequest();
     var data = JSON.stringify({
         version: 'stable',
@@ -352,12 +343,12 @@ function runProgram(program, callback) {
     req.onreadystatechange = function() {
         // Wait for the request to complete
         if (req.readyState !== 4) return;
-        if (req.status !== 200) return callback();
+        if (req.status !== 200) return handleError(activeCode);
 
         var response = JSON.parse(req.response);
-        if (!response.rustc) return callback();
+        if (!response.rustc) return handleError(activeCode);
 
-        return callback({
+        return handleResult(activeCode, {
             compiler: response.rustc,
             program: response.program
         });
@@ -367,27 +358,29 @@ function runProgram(program, callback) {
     req.send(data);
 }
 
-// The callback to runProgram
-function handleResult(result) {
+// The error handler for executeCode
+function handleError(activeCode) {
     // Clear out the result content
-    resultDiv.textContent = '';
+    activeCode.resultDiv.textContent = '';
 
-    // If we got here from some unknown error, just bail
-    if (result === undefined) {
-        var samp = document.createElement('samp');
-        samp.innerHTML = errMsg;
-        var pre = document.createElement('pre');
-        pre.className = 'rustc-output rustc-errors'
-        pre.appendChild(samp);
-        resultDiv.appendChild(pre);
-        return;
-    }
+    var samp = document.createElement('samp');
+    samp.innerHTML = errMsg;
+    var pre = document.createElement('pre');
+    pre.className = 'rustc-output rustc-errors'
+    pre.appendChild(samp);
+    activeCode.resultDiv.appendChild(pre);
+}
+
+// The result handler for executeCode
+function handleResult(activeCode, result) {
+    // Clear out the result content
+    activeCode.resultDiv.textContent = '';
 
     var compiler = result.compiler || '';
     var program = result.program || '';
 
     // Unpack the compiler output from the json format
-    var processed = processCompilerOutput(compiler);
+    var processed = processCompilerOutput(activeCode, compiler);
     compiler = processed.output;
 
     // Check the size of the message, shorten it if
@@ -407,7 +400,7 @@ function handleResult(result) {
     if (!program)
         pre.className += processed.error ? ' rustc-errors' : ' rustc-warnings';
     pre.appendChild(samp);
-    resultDiv.appendChild(pre);
+    activeCode.resultDiv.appendChild(pre);
 
 
     if (program) {
@@ -416,6 +409,6 @@ function handleResult(result) {
         var pre = document.createElement('pre');
         pre.className = 'output'
         pre.appendChild(samp);
-        resultDiv.appendChild(pre);
+        activeCode.resultDiv.appendChild(pre);
     }
 }

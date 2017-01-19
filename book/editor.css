@@ -1,90 +1,87 @@
 /* the style here follows graydon/rust-www */
 
-#active-code {
-  position: relative;
-  display: block;
-  padding: 10px;
-  border-radius: 4px;
-  background-color: rgba(0, 0, 0, 0.01);
-  border: 2px solid #CCC;
-  margin-bottom: 16px;
+.active-code {
+    position: relative;
+    display: block;
+    padding: 10px;
+    border-radius: 4px;
+    background-color: rgba(0, 0, 0, 0.01);
+    border: 2px solid #CCC;
+    margin-bottom: 16px;
 }
 
-#editor {
-  padding: none;
-  margin: none;
-  width: 100%;
-  min-height: 72px;
-  font-family: Menlo, Monaco, Consolas, monospace;
-  white-space: pre-wrap;
+.editor {
+    padding: none;
+    margin: none;
+    width: 100%;
+    min-height: 72px;
+    font-family: Menlo, Monaco, Consolas, monospace;
+    white-space: pre-wrap;
 }
 
-#result {
-  background-color: rgba(255, 255, 255, 0.25);
-  margin-top: 10px;
-  padding: 10px;
-  display: none;
-  border-radius: 4px;
-  font-family: Menlo, Monaco, Consolas, monospace;
-  white-space: pre-wrap;
+.result {
+    background-color: rgba(255, 255, 255, 0.25);
+    margin-top: 10px;
+    padding: 10px;
+    display: none;
+    border-radius: 4px;
+    font-family: Menlo, Monaco, Consolas, monospace;
+    white-space: pre-wrap;
 }
 
-#reset-code {
-  position: absolute;
-  z-index: 10;
-  float: right;
-  right: 8px;
-  top: 50px;
-  outline: none;
+.reset-code {
+    top: 50px;
 }
 
-#run-code {
-  position: absolute;
-  z-index: 10;
-  float: right;
-  right: 8px;
-  top: 8px;
-  outline: none;
+.run-code {
+    top: 8px;
 }
 
 .ace_editor {
-  font-size: 80% !important;
+    font-size: 80% !important;
 }
 
 .ace-error-text, .ace-warning-text, .ace-hover-text {
-  position: absolute;
+    position: absolute;
 }
 
 .ace-error-text {
-  background-color: #E9ABAB;
+    background-color: #E9ABAB;
 }
 
 .ace-warning-text {
-  background-color: #FFEF00;
+    background-color: #FFEF00;
 }
 
 .ace-hover-text {
-  filter: hue-rotate(90deg);
+    filter: hue-rotate(90deg);
 }
 
-.btn-primary {
-  color: #fff;
-  background-color: #428bca;
-  border-color: #357ebd;
-  border-radius: 4px;
+.btn {
+    position: absolute;
+    z-index: 10;
+    float: right;
+    right: 8px;
+    outline: none;
+    color: #fff;
+    background-color: #428bca;
+    border-color: #357ebd;
+    border-radius: 4px;
 }
-.btn-primary:hover,
-.btn-primary:focus,
-.btn-primary:active {
-  color: #fff;
-  background-color: #3276b1;
-  border-color: #285e8e;
+
+.btn:hover, .btn:focus, .btn:active {
+    color: #fff;
+    background-color: #3276b1;
+    border-color: #285e8e;
 }
-.btn-primary:active {
-  background-image: none;
+
+.btn:active {
+    background-image: none;
 }
+
 
 /* rustc output. bright versions of red, yellow, green, cyan and magenta are used, but black, blue and gray could theoretically be added with dim versions of them. */
+
 .rustc-output {
     white-space: pre-wrap;
     background-color: #E2EEF6;
