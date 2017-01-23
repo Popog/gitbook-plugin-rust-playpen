@@ -1,3 +1,5 @@
+const escapeHTML = require('escape-html');
+
 module.exports = {
     book: {
         assets: './book',
@@ -16,10 +18,18 @@ module.exports = {
                     page.editors++;
                 }
 
+                for (var sblock of block.blocks) {
+                    if (sblock.args.length < 1) {
+                        throw "Include block missing argument";
+                    } else if (sblock.args.length > 1) {
+                        throw "Include block too many arguments";
+                    }
+                }
+
                 var result = '<div class="active-code" id="active-code-' + page.editors + '">' +
                     '\n<button class="btn run-code"   type="button" onclick="executeCode(' + page.editors + ')">Run</button>' +
                     '\n<button class="btn reset-code" type="button" onclick="resetCode(' + page.editors + ')">Reset</button>' +
-                    '\n<div class="editor"><pre>' + block.body;
+                    '\n<div class="editor"><pre>' + escapeHTML(block.body);
 
                 var sblocks = Promise.all(block.blocks.map(sblock =>
                     readFileAsString(sblock.args[0]).then(file => ({
@@ -29,7 +39,7 @@ module.exports = {
 
                 return sblocks.then(sblocks => {
                     for (var sblock of sblocks) {
-                        result += sblock.file + sblock.body;
+                        result += escapeHTML(sblock.file) + escapeHTML(sblock.body);
                     }
 
                     result += '</pre></div>' +

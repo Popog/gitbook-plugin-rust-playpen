@@ -3,12 +3,15 @@
   "engines": {
     "gitbook": "*"
   },
+  "dependencies": {
+    "escape-html": "*"
+  },
   "devDependencies": {
     "ace-builds": "*"
   },
   "main": "index.js",
   "name": "gitbook-plugin-rust-playpen",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/Popog/gitbook-plugin-rust-playpen.git"
